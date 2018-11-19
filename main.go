@@ -9,7 +9,7 @@ import (
 
 func customHandler(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("200: Sending 'hello'")
+	fmt.Println("Sending 'hello'")
 	fmt.Fprintf(w,"Hello")
 }
 
@@ -18,7 +18,7 @@ func clientHandler(w http.ResponseWriter, r *http.Request) {
 	filePath :=  "." + r.URL.Path
 
 	if !strings.HasPrefix(filePath, "./client/") {
-		fmt.Println("500: Internal server error", filePath)
+		fmt.Println("ERROR: Invalid client path", filePath)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -27,12 +27,12 @@ func clientHandler(w http.ResponseWriter, r *http.Request) {
 
 	info, err := os.Stat(filePath)
 	if os.IsNotExist(err) || info.IsDir() {
-		fmt.Println("404: File not found", filePath)
+		fmt.Println("ERROR: File not found", filePath)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	fmt.Println("200: Serving file", filePath)
+	fmt.Println("Serving file", filePath)
 	http.ServeFile(w, r, filePath)
 
 }
@@ -40,9 +40,7 @@ func clientHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 
 	http.HandleFunc("/client/", clientHandler)
-
 	http.HandleFunc("/", customHandler)
 
-
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":8080", http.DefaultServeMux)
 }
