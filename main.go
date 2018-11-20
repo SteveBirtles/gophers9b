@@ -403,6 +403,7 @@ func awaitShutdown(c chan os.Signal) {
 	for range c {
 		fmt.Println("Disconnecting from to database...")
 		database.Close()
+		os.Exit(0)
 	}
 }
 
