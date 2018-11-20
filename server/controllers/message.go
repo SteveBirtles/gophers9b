@@ -50,7 +50,7 @@ func NewMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	id++
 
-	date := time.Now().Format("02-03-2006 15:04:05")
+	date := time.Now().Format("02-01-2006 15:04:05")
 
 	fmt.Println("/message/new", id, messageText, username, date)
 
