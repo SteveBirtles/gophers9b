@@ -3,10 +3,11 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/stevebirtles/gophers9a/server/models"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/stevebirtles/gophers9a/server/models"
 )
 
 func ListMessages(w http.ResponseWriter, r *http.Request) {

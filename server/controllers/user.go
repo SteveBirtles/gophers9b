@@ -3,8 +3,9 @@ package controllers
 import (
 	"fmt"
 	"github.com/satori/go.uuid"
-	"github.com/stevebirtles/gophers9a/server/models"
 	"net/http"
+
+	"github.com/stevebirtles/gophers9a/server/models"
 )
 
 func validateSessionToken(r *http.Request) string {
