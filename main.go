@@ -1,11 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/satori/go.uuid"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"time"
@@ -25,10 +28,109 @@ type User struct {
 	SessionToken string `json:"sessionToken"`
 }
 
-var (
-	messages = make([]Message, 0)
-	users    = make([]User, 0)
-)
+var database *sql.DB
+
+func selectAllUsers() []User {
+
+	users := make([]User, 0)
+
+	rows, err := database.Query("select Id, Username, Password, SessionToken from Users")
+	if err != nil {
+		fmt.Println("Database select all error:", err)
+		return users
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var u User
+		err = rows.Scan(&u.Id, &u.Username, &u.Password, &u.SessionToken)
+		if err != nil {
+			fmt.Println("Database select all error:", err)
+			break
+		}
+		users = append(users, u)
+	}
+
+	return users
+
+}
+
+func insertUser(user User) {
+
+	_, err := database.Exec(fmt.Sprintf("insert into Users (Id, Username, Password, SessionToken) values (%d, '%s', '%s', '%s')",
+		user.Id, user.Username, user.Password, user.SessionToken))
+
+	if err != nil {
+		fmt.Println("Database insert error:", err)
+	}
+
+}
+
+func updateUser(user User) {
+
+	_, err := database.Exec(fmt.Sprintf("update Users set Username = '%s', Password = '%s', SessionToken = '%s' where Id = %d",
+		user.Username, user.Password, user.SessionToken, user.Id))
+
+	if err != nil {
+		fmt.Println("Database update error:", err)
+	}
+
+}
+
+func selectAllMessages() []Message {
+
+	messages := make([]Message, 0)
+
+	rows, err := database.Query("select Id, Text, PostDate, Author from Messages")
+	if err != nil {
+		fmt.Println("Database select all error:", err)
+		return messages
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var m Message
+		err = rows.Scan(&m.Id, &m.Text, &m.PostDate, &m.Author)
+		if err != nil {
+			fmt.Println("Database select all error:", err)
+			break
+		}
+		messages = append(messages, m)
+	}
+
+	return messages
+}
+
+func insertMessage(message Message) {
+
+	_, err := database.Exec(fmt.Sprintf("insert into Messages (Id, Text, PostDate, Author) values (%d, '%s', '%s', '%s')",
+		message.Id, message.Text, message.PostDate, message.Author))
+
+	if err != nil {
+		fmt.Println("Database insert error:", err)
+	}
+
+}
+
+func updateMessage(message Message) {
+
+	_, err := database.Exec(fmt.Sprintf("update Messages set Text = '%s', PostDate = '%s', Author = '%s' where Id = %d",
+		message.Text, message.PostDate, message.Author, message.Id))
+
+	if err != nil {
+		fmt.Println("Database update error:", err)
+	}
+
+}
+
+func deleteMessage(id int) {
+
+	_, err := database.Exec(fmt.Sprintf("delete from Messages where Id = %d", id))
+
+	if err != nil {
+		fmt.Println("Database delete error:", err)
+	}
+}
 
 func clientHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -66,6 +168,8 @@ func validateSessionToken(r *http.Request) string {
 		sessionToken = cookie.Value
 	}
 
+	users := selectAllUsers()
+
 	for i := range users {
 		if users[i].SessionToken == sessionToken {
 			return users[i].Username
@@ -83,6 +187,8 @@ func listMessagesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Println("/message/list")
+
+	messages := selectAllMessages()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(messages)
@@ -104,6 +210,8 @@ func newMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	messageText := r.FormValue("messageText")
 
+	messages := selectAllMessages()
+
 	id := 0
 	for _, m := range messages {
 		if m.Id > id {
@@ -116,12 +224,13 @@ func newMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("/message/new", id, messageText, username, date)
 
-	messages = append(messages, Message{
+	insertMessage(Message{
 		Id:       id,
 		Text:     messageText,
 		PostDate: date,
 		Author:   username,
 	})
+
 	fmt.Fprint(w, "OK")
 
 }
@@ -142,18 +251,18 @@ func deleteMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("/message/delete", username, id)
 
-	for i := 0; i < len(messages); {
+	messages := selectAllMessages()
+
+	for i := range messages {
 		if messages[i].Id == id {
 			if messages[i].Author != username {
 				fmt.Println(username, messages[i].Author)
 				fmt.Fprint(w, "Error: You didn't post that originally")
 				return
 			}
-			messages = append(messages[:i], messages[i+1:]...)
+			deleteMessage(id)
 			fmt.Fprint(w, "OK")
 			return
-		} else {
-			i++
 		}
 	}
 
@@ -177,6 +286,8 @@ func editMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	newText := r.FormValue("messageText")
 
+	messages := selectAllMessages()
+
 	for i := range messages {
 		if messages[i].Id == id {
 			if messages[i].Author != username {
@@ -184,6 +295,7 @@ func editMessageHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			messages[i].Text = newText
+			updateMessage(messages[i])
 		}
 	}
 
@@ -203,13 +315,18 @@ func newUserHandler(w http.ResponseWriter, r *http.Request) {
 	password2 := r.FormValue("password2")
 
 	if password1 != password2 {
-		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, "Error: Passwords don't match")
 		return
 	}
 
+	users := selectAllUsers()
+
 	id := 0
 	for _, u := range users {
+		if u.Username == username {
+			fmt.Fprint(w, "Error: User already exists")
+			return
+		}
 		if u.Id > id {
 			id = u.Id
 		}
@@ -217,7 +334,8 @@ func newUserHandler(w http.ResponseWriter, r *http.Request) {
 	id++
 
 	token := uuid.Must(uuid.NewV4()).String()
-	users = append(users, User{id, username, password1, token})
+
+	insertUser(User{id, username, password1, token})
 
 	fmt.Println("/user/new", username, password1)
 	fmt.Fprint(w, token)
@@ -234,6 +352,8 @@ func loginUserHandler(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	fmt.Println("/user/login", username, password)
 
+	users := selectAllUsers()
+
 	for i := range users {
 		if users[i].Username == username {
 			if users[i].Password != password {
@@ -242,6 +362,7 @@ func loginUserHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			token := uuid.Must(uuid.NewV4()).String()
 			users[i].SessionToken = token
+			updateUser(users[i])
 			fmt.Fprint(w, token)
 			return
 		}
@@ -261,6 +382,28 @@ func getUserHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("/user/get", username)
 	fmt.Fprint(w, username)
 
+}
+
+func init() {
+
+	var err error
+	fmt.Println("Connecting to database...")
+	database, err = sql.Open("sqlite3", "MessageBoard.db")
+	if err != nil {
+		panic(err)
+	}
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go awaitShutdown(c)
+
+}
+
+func awaitShutdown(c chan os.Signal) {
+	for range c {
+		fmt.Println("Disconnecting from to database...")
+		database.Close()
+	}
 }
 
 func main() {
