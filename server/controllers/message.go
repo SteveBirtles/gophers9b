@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/stevebirtles/gophers9a/server/models"
+	"github.com/stevebirtles/gophers9b/server/models"
 )
 
 func ListMessages(w http.ResponseWriter, r *http.Request) {

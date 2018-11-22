@@ -5,7 +5,7 @@ import (
 	"github.com/satori/go.uuid"
 	"net/http"
 
-	"github.com/stevebirtles/gophers9a/server/models"
+	"github.com/stevebirtles/gophers9b/server/models"
 )
 
 func validateSessionToken(r *http.Request) string {

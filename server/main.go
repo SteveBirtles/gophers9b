@@ -3,8 +3,8 @@ package main
 import (
 	"net/http"
 
-	"github.com/stevebirtles/gophers9a/server/controllers"
-	_ "github.com/stevebirtles/gophers9a/server/models"
+	"github.com/stevebirtles/gophers9b/server/controllers"
+	_ "github.com/stevebirtles/gophers9b/server/models"
 )
 
 func main() {
